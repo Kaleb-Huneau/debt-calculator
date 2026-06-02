@@ -244,29 +244,9 @@ export default function Home() {
                 flexDirection: "column",
             }}
         >
-            <header
-                style={{
-                    backgroundColor: "var(--maroon)",
-                    color: "var(--white)",
-                    padding: "0 2rem",
-                    height: "64px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    borderBottom: "3px solid var(--maroon-dark)",
-                    flexShrink: 0,
-                }}
-            >
+            <header className="app-header">
                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
-                    <h1
-                        style={{
-                            fontFamily: "'Playfair Display', serif",
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            margin: 0,
-                            letterSpacing: "-0.01em",
-                        }}
-                    >
+                    <h1 className="header-title">
                         Med School Debt Calculator
                     </h1>
                 </div>
@@ -330,28 +310,8 @@ export default function Home() {
                 </div>
             </header>
 
-            <div
-                style={{
-                    display: "flex",
-                    flex: 1,
-                    gap: 0,
-                    overflow: "hidden",
-                    minHeight: "calc(100vh - 64px)",
-                }}
-            >
-                <aside
-                    style={{
-                        width: "340px",
-                        flexShrink: 0,
-                        backgroundColor: "var(--white)",
-                        borderRight: "1px solid var(--maroon-border)",
-                        overflowY: "auto",
-                        padding: "1.5rem",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "1.5rem",
-                    }}
-                >
+            <div className="app-layout">
+                <aside className="sidebar-panel">
                     <section>
                         <SectionHeader label="Student Loan" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -420,14 +380,14 @@ export default function Home() {
                     </section>
                 </aside>
 
-                <main style={{ flex: 1, padding: "1.5rem 2rem", overflowY: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+                <main className="main-panel">
+                    <div className="summary-cards-grid">
                         <SummaryCard label={`Total Spent in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.expenses} color="var(--maroon)" />
                         <SummaryCard label={`Interest Collected in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.cumulativeInterest} color="var(--maroon-light)" />
                         <SummaryCard label="Total Debt" value={finalMonth.totalDebt} color={finalMonth.totalDebt === 0 ? "#2d6a3f" : "var(--maroon-dark)"} note={finalMonth.totalDebt === 0 ? "Paid off! 🎉" : undefined} />
                     </div>
 
-                    <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1.5rem", flex: 1, minHeight: "400px" }}>
+                    <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1.5rem", flex: 1, minHeight: "280px" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
                             <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 600, margin: 0, color: "var(--maroon-dark)" }}>{years}-Year Financial Projection</h2>
                             <div style={{ display: "flex", gap: "1.25rem" }}>
@@ -443,8 +403,8 @@ export default function Home() {
 
                     <section>
                         <SectionHeader label="Repayment Plan" />
-                        <div style={{ display: "flex", gap: "1.25rem" }}>
-                            <div style={{ width: "340px", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div className="repayment-flex">
+                            <div className="repayment-controls-col">
 
 
                                 <SliderInput label="Salary (annual after tax)" value={salary} onChange={setSalary} min={0} max={800000} step={1000} />
@@ -452,12 +412,12 @@ export default function Home() {
                                 <SliderInput label="Monthly Payment" value={repaymentMonthly} onChange={setRepaymentMonthly} min={0} max={Math.max(0, Math.floor(salary / 12))} step={25} />
                             </div>
 
-                            <div style={{ flex: 1, backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1rem" }}>
+                            <div style={{ flex: 1, minWidth: 0, backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1rem" }}>
                                 <DebtChart data={repaymentProjectionData} years={repaymentChartYears} debtOnly />
                             </div>
                         </div>
                     </section>
-                    <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div className="payback-card" style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1rem" }}>
                         <div>
                             <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "var(--maroon-dark)", marginBottom: "0.25rem" }}>Payback Period</div>
                             <div style={{ fontSize: "1.05rem", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--text-primary)" }}>{payoffText}</div>
@@ -491,7 +451,7 @@ export default function Home() {
                                     </div>
                                 </div>
 
-                                <div style={{ display: "flex", gap: "1.5rem" }}>
+                                <div className="stats-row">
                                     <div>
                                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Before repayment</div>
                                         <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${interestBefore.toLocaleString()}</div>
@@ -520,7 +480,7 @@ export default function Home() {
 
                                 </div>
 
-                                <div style={{ display: "flex", gap: "1.5rem" }}>
+                                <div className="stats-row">
                                     <div>
                                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total Principal</div>
                                         <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${finalMonth.expenses.toLocaleString()}</div>
