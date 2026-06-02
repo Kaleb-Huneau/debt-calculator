@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --maroon: #6B0F1A;
+  --maroon-dark: #4A0B12;
+  --maroon-light: #8B1A28;
+  --maroon-faint: #f5eaec;
+  --maroon-border: #d4b5ba;
+  --white: #FAFAF8;
+  --off-white: #F2EFE9;
+  --text-primary: #1a0a0c;
+  --text-secondary: #5c3039;
+  --text-muted: #9a6870;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--off-white);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  margin: 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--off-white);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--maroon-border);
+  border-radius: 3px;
+}
+
+/* Slider styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--maroon-border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--maroon);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid var(--white);
+  box-shadow: 0 0 0 1px var(--maroon);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px var(--maroon);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--maroon);
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid var(--white);
+  box-shadow: 0 0 0 1px var(--maroon);
+}
+
+/* Number input */
+input[type="number"] {
+  font-family: 'DM Mono', monospace;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
