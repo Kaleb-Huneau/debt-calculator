@@ -12,11 +12,14 @@ export default function Home() {
     const [interestBefore, setInterestBefore] = useState(0);
     const [totalAmount, setTotalAmount] = useState(0);
     const [loanBalance, setLoanBalance] = useState(0);
-    const [interestRate, setInterestRate] = useState(6);
+    const [osapLoanBalance, setOsapLoanBalance] = useState(0);
+    const [osapGrants, setOsapGrants] = useState(0);
+    const [interestRate, setInterestRate] = useState(4.5);
     const [interestDuringResidency, setInterestDuringResidency] = useState(0);
     const [residencyPeriod, setResidencyPeriod] = useState(0);
     // Fixed monthly expenses
     const [phone, setPhone] = useState(60);
+    const [utilities, setUtilities] = useState(100);
     const [internet, setInternet] = useState(70);
     const [groceries, setGroceries] = useState(300);
 
@@ -36,7 +39,7 @@ export default function Home() {
     // Annual tuition (paid at the start of each year)
     const [tuition, setTuition] = useState(30000);
 
-    const monthlyExpenses = phone + internet + groceries + rent + car + fun;
+    const monthlyExpenses = phone + utilities + internet + groceries + rent + car + fun;
 
     const handleRepaymentChange = (e: React.ChangeEvent<HTMLSelectElement, HTMLSelectElement>) => {
         const years = parseInt(e.target.value, 10);
@@ -72,8 +75,13 @@ export default function Home() {
             // Tuition is paid (borrowed) at the start of each year (including m === 0)
             if (month === 0 && year < years && tuition > 0) {
                 cumulativeExpenses += tuition;
+                cumulativeExpenses -= osapGrants;
+                cumulativeExpenses -= osapLoanBalance;
+                balance -= osapLoanBalance;
+                balance -= osapGrants;
                 balance += tuition;
             }
+
 
             // Monthly expenses are added each month after the first snapshot (m > 0)
             if (m > 0) {
@@ -92,11 +100,16 @@ export default function Home() {
                     : month === 6
                         ? `Yr ${year}.5`
                         : null;
+            if (month === 0 && year == years) {
+                cumulativeExpenses += (osapLoanBalance * years)
+                balance += (osapLoanBalance * years)
+            }
 
             const totalDebt = balance;
             if (month === 0) {
                 annualTotalDebtStep = Math.round(totalDebt);
             }
+
             setTotalAmount(balance);
             data.push({
                 month: m,
@@ -111,7 +124,7 @@ export default function Home() {
         }
         setInterestBefore(cumulativeInterest);
         return data;
-    }, [loanBalance, interestRate, monthlyExpenses, years, tuition]);
+    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants]);
 
     const finalMonth = projectionData[projectionData.length - 1];
 
@@ -153,6 +166,9 @@ export default function Home() {
             cumulativeInterest = 0;
             cumulativeExpenses = 0;
             annualStep = Math.round(balance);
+            if (residencyPeriod != 0) {
+                balance *= (((interestRate / 100) + 1) ** residencyPeriod)
+            }
         } else {
             const prev = projectionData[Math.max(0, startMonth - 1)];
             balance = prev.totalDebt;
@@ -315,7 +331,7 @@ export default function Home() {
                     <section>
                         <SectionHeader label="Student Loan" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                            <SliderInput
+                            <NumberInput
                                 label="Initial Balance"
                                 value={loanBalance}
                                 onChange={setLoanBalance}
@@ -324,12 +340,28 @@ export default function Home() {
                                 step={500}
                             />
                             <NumberInput
+                                label="OSAP Loans (Estimated Annual)"
+                                value={osapLoanBalance}
+                                onChange={setOsapLoanBalance}
+                                min={0}
+                                max={500000}
+                                step={100}
+                            />
+                            <NumberInput
+                                label="OSAP Grants (Estimated Annual)"
+                                value={osapGrants}
+                                onChange={setOsapGrants}
+                                min={0}
+                                max={20000}
+                                step={100}
+                            />
+                            <NumberInput
                                 label="Interest Rate"
                                 value={interestRate}
                                 onChange={setInterestRate}
                                 min={0}
                                 max={20}
-                                step={0.1}
+                                step={0.01}
                                 suffix="%"
                                 decimals={1}
                             />
@@ -339,9 +371,10 @@ export default function Home() {
                     <Divider />
 
                     <section>
-                        <SectionHeader label="Fixed Monthly Bills" />
+                        <SectionHeader label="Smaller Expenses" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                            <SliderInput label="Phone Bill" value={phone} onChange={setPhone} min={0} max={500} step={1} />
+                            <SliderInput label="Phone Bill" value={phone} onChange={setPhone} min={0} max={150} step={1} />
+                            <SliderInput label="Utilities" value={utilities} onChange={setUtilities} min={0} max={500} step={1} />
                             <SliderInput label="Internet" value={internet} onChange={setInternet} min={0} max={300} step={1} />
                             <SliderInput label="Groceries" value={groceries} onChange={setGroceries} min={0} max={1500} step={10} />
                         </div>
@@ -350,7 +383,7 @@ export default function Home() {
                     <Divider />
 
                     <section>
-                        <SectionHeader label="Variable Expenses" />
+                        <SectionHeader label="Bigger Expenses" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                             <SliderInput label="Rent" value={rent} onChange={setRent} min={0} max={3000} step={50} />
                             <SliderInput label="Car" value={car} onChange={setCar} min={0} max={1500} step={25} />
@@ -378,13 +411,22 @@ export default function Home() {
                             <div style={{ borderTop: "1.5px solid var(--maroon-border)", marginTop: "0.4rem", paddingTop: "0.4rem" }} />
                         </div>
                     </section>
+                    <script async
+                        src="https://js.stripe.com/v3/buy-button.js">
+                    </script>
+
+                    <stripe-buy-button
+                        buy-button-id="buy_btn_1TeKuFEEl52JxHHzVlhyY9tO"
+                        publishable-key="pk_live_51SZZHaEEl52JxHHz9YHobdPufBRKFGy2hG8gWgH5XUf3R1MldUJZ3n0KGoG4ARsivOnhFjUFrzn2vXjQdi4zNbbb00bZMJEiyb"
+                    >
+                    </stripe-buy-button>
                 </aside>
 
                 <main className="main-panel">
                     <div className="summary-cards-grid">
                         <SummaryCard label={`Total Spent in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.expenses} color="var(--maroon)" />
                         <SummaryCard label={`Interest Collected in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.cumulativeInterest} color="var(--maroon-light)" />
-                        <SummaryCard label="Total Debt" value={finalMonth.totalDebt} color={finalMonth.totalDebt === 0 ? "#2d6a3f" : "var(--maroon-dark)"} note={finalMonth.totalDebt === 0 ? "Paid off! 🎉" : undefined} />
+                        <SummaryCard label="Total Debt After 4 Years" value={finalMonth.totalDebt} color={finalMonth.totalDebt === 0 ? "#2d6a3f" : "var(--maroon-dark)"} note={finalMonth.totalDebt === 0 ? "Paid off! 🎉" : undefined} />
                     </div>
 
                     <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1.5rem", flex: 1, minHeight: "280px" }}>
@@ -501,6 +543,7 @@ export default function Home() {
                     <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", margin: 0, fontFamily: "'DM Mono', monospace" }}>* Projections assume fixed monthly expenses and constant interest rate. Car and fun values represent estimates. This is not financial advice.</p>
                 </main>
             </div>
+
         </div>
     );
 }
