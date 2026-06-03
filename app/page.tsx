@@ -411,14 +411,6 @@ export default function Home() {
                             <div style={{ borderTop: "1.5px solid var(--maroon-border)", marginTop: "0.4rem", paddingTop: "0.4rem" }} />
                         </div>
                     </section>
-                    <script async
-                        src="https://js.stripe.com/v3/buy-button.js">
-                    </script>
-
-                    {React.createElement('stripe-buy-button', {
-                        'buy-button-id': "buy_btn_1TeKuFEEl52JxHHzVlhyY9tO",
-                        'publishable-key': "pk_live_51SZZHaEEl52JxHHz9YHobdPufBRKFGy2hG8gWgH5XUf3R1MldUJZ3n0KGoG4ARsivOnhFjUFrzn2vXjQdi4zNbbb00bZMJEiyb",
-                    })}
                 </aside>
 
                 <main className="main-panel">
