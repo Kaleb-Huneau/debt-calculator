@@ -32,9 +32,11 @@ body {
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--off-white);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--maroon-border);
   border-radius: 3px;
@@ -224,4 +226,23 @@ input[type="number"]::-webkit-outer-spin-button {
   .summary-cards-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Maroon button: maroon background by default, white text; on hover invert to white background with maroon text */
+.btn-maroon {
+  display: inline-block;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: var(--maroon);
+  color: var(--white);
+  border: 1px solid var(--maroon-border);
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+  text-align: center;
+}
+
+.btn-maroon:hover {
+  background-color: white;
+  color: var(--maroon-dark);
+  border-color: var(--maroon-dark);
 }

@@ -12,19 +12,19 @@ export default function Home() {
     const [interestBefore, setInterestBefore] = useState(0);
     const [totalAmount, setTotalAmount] = useState(0);
     const [loanBalance, setLoanBalance] = useState(0);
-    const [osapLoanBalance, setOsapLoanBalance] = useState(0);
-    const [osapGrants, setOsapGrants] = useState(0);
+    const [osapLoanBalance, setOsapLoanBalance] = useState(20000);
+    const [osapGrants, setOsapGrants] = useState(7000);
     const [interestRate, setInterestRate] = useState(4.5);
     const [interestDuringResidency, setInterestDuringResidency] = useState(0);
     const [residencyPeriod, setResidencyPeriod] = useState(0);
     // Fixed monthly expenses
     const [phone, setPhone] = useState(60);
-    const [utilities, setUtilities] = useState(100);
+    const [utilities, setUtilities] = useState(110);
     const [internet, setInternet] = useState(70);
     const [groceries, setGroceries] = useState(300);
 
     // Slider expenses
-    const [rent, setRent] = useState(1750);
+    const [rent, setRent] = useState(2200);
     const [car, setCar] = useState(600);
     const [fun, setFun] = useState(500);
 
@@ -38,24 +38,21 @@ export default function Home() {
 
     // Annual tuition (paid at the start of each year)
     const [tuition, setTuition] = useState(30000);
+    // One-time expenses (three separate amount + year fields)
+    const [oneTimeExpense, setOneTimeExpense] = useState(0);
+    const [oneTimeExpenseYear, setOneTimeExpenseYear] = useState(1);
+    const [oneTimeExpense2, setOneTimeExpense2] = useState(0);
+    const [oneTimeExpense2Year, setOneTimeExpense2Year] = useState(1);
+    const [oneTimeExpense3, setOneTimeExpense3] = useState(0);
+    const [oneTimeExpense3Year, setOneTimeExpense3Year] = useState(1);
 
     const monthlyExpenses = phone + utilities + internet + groceries + rent + car + fun;
 
     const handleRepaymentChange = (e: React.ChangeEvent<HTMLSelectElement, HTMLSelectElement>) => {
         const years = parseInt(e.target.value, 10);
-
-        let acc = totalAmount;
-
-        for (let i = 0; i < years; i++) {
-            acc *= (1 + (interestRate / 100));
-        }
-        if (years == 0) {
-            setInterestDuringResidency(0);
-        } else {
-            setInterestDuringResidency(acc - totalAmount);
-        }
         setResidencyPeriod(years);
     };
+
 
     const projectionData = useMemo(() => {
         const months = years * 12;
@@ -76,10 +73,24 @@ export default function Home() {
             if (month === 0 && year < years && tuition > 0) {
                 cumulativeExpenses += tuition;
                 cumulativeExpenses -= osapGrants;
-                cumulativeExpenses -= osapLoanBalance;
-                balance -= osapLoanBalance;
                 balance -= osapGrants;
                 balance += tuition;
+            }
+
+            // One-time expenses occur at the start of the selected year (human year 1..N -> code year 0..N-1)
+            if (month === 0) {
+                if (oneTimeExpense > 0 && year === Math.max(0, oneTimeExpenseYear - 1)) {
+                    cumulativeExpenses += oneTimeExpense;
+                    balance += oneTimeExpense;
+                }
+                if (oneTimeExpense2 > 0 && year === Math.max(0, oneTimeExpense2Year - 1)) {
+                    cumulativeExpenses += oneTimeExpense2;
+                    balance += oneTimeExpense2;
+                }
+                if (oneTimeExpense3 > 0 && year === Math.max(0, oneTimeExpense3Year - 1)) {
+                    cumulativeExpenses += oneTimeExpense3;
+                    balance += oneTimeExpense3;
+                }
             }
 
 
@@ -90,7 +101,7 @@ export default function Home() {
             }
 
             // Interest accrues on the outstanding balance and is capitalized (compounds)
-            const interestThisMonth = balance * monthlyRate;
+            const interestThisMonth = (balance - (osapLoanBalance * year)) * monthlyRate;
             cumulativeInterest += interestThisMonth;
             balance += interestThisMonth;
 
@@ -100,17 +111,12 @@ export default function Home() {
                     : month === 6
                         ? `Yr ${year}.5`
                         : null;
-            if (month === 0 && year == years) {
-                cumulativeExpenses += (osapLoanBalance * years)
-                balance += (osapLoanBalance * years)
-            }
 
             const totalDebt = balance;
             if (month === 0) {
                 annualTotalDebtStep = Math.round(totalDebt);
             }
 
-            setTotalAmount(balance);
             data.push({
                 month: m,
                 label: label || "",
@@ -122,15 +128,43 @@ export default function Home() {
                 total: Math.round(balance + cumulativeExpenses),
             });
         }
-        setInterestBefore(cumulativeInterest);
+        let acc = totalAmount;
+
+        for (let i = 0; i < years; i++) {
+            acc *= (1 + (interestRate / 100));
+        }
+        if (years == 0) {
+            setInterestDuringResidency(0);
+        } else {
+            setInterestDuringResidency(acc - totalAmount);
+        }
         return data;
-    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants]);
+    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants, oneTimeExpense, oneTimeExpenseYear, oneTimeExpense2, oneTimeExpense2Year, oneTimeExpense3, oneTimeExpense3Year, interestDuringResidency, residencyPeriod]);
+
+    // Update derived states from the projection data in an effect (avoid setState inside useMemo)
+    useEffect(() => {
+        if (!projectionData || projectionData.length === 0) {
+            setTotalAmount(0);
+            setInterestBefore(0);
+            return;
+        }
+        const last = projectionData[projectionData.length - 1];
+        setTotalAmount(last?.totalDebt ?? 0);
+        setInterestBefore(last?.cumulativeInterest ?? 0);
+    }, [projectionData]);
+
+    // keep selected one-time year(s) within the projection range
+    useEffect(() => {
+        setOneTimeExpenseYear((prev) => Math.min(prev, years));
+        setOneTimeExpense2Year((prev) => Math.min(prev, years));
+        setOneTimeExpense3Year((prev) => Math.min(prev, years));
+    }, [years]);
 
     const finalMonth = projectionData[projectionData.length - 1];
 
     // Repayment controls
-    const [salary, setSalary] = useState(250000);
-    const [repaymentMonthly, setRepaymentMonthly] = useState(4000);
+    const [salary, setSalary] = useState(200000);
+    const [repaymentMonthly, setRepaymentMonthly] = useState(10000);
     const [repaymentDelayYears, setRepaymentDelayYears] = useState(0);
 
     useEffect(() => {
@@ -162,12 +196,13 @@ export default function Home() {
         let annualStep = 0;
 
         if (startMonth === 0) {
-            balance = totalAmount;
+            const lastProjection = projectionData[projectionData.length - 1];
+            balance = lastProjection ? lastProjection.totalDebt : 0;
             cumulativeInterest = 0;
             cumulativeExpenses = 0;
             annualStep = Math.round(balance);
-            if (residencyPeriod != 0) {
-                balance *= (((interestRate / 100) + 1) ** residencyPeriod)
+            if (residencyPeriod !== 0) {
+                balance *= Math.pow((interestRate / 100) + 1, residencyPeriod);
             }
         } else {
             const prev = projectionData[Math.max(0, startMonth - 1)];
@@ -211,7 +246,7 @@ export default function Home() {
         }
 
         return data;
-    }, [projectionData, repaymentMonthly, repaymentDelayYears, years, interestRate, loanBalance, tuition]);
+    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants, oneTimeExpense, oneTimeExpenseYear, oneTimeExpense2, oneTimeExpense2Year, oneTimeExpense3, oneTimeExpense3Year, interestDuringResidency, residencyPeriod, projectionData]);
 
     // Payback period calculation (months from now until totalDebt reaches 0)
     const payoffIndex = repaymentProjectionData.findIndex((d) => d.totalDebt <= 0);
@@ -395,6 +430,109 @@ export default function Home() {
                         <SectionHeader label="Annual Costs" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                             <NumberInput label="Tuition (per year)" value={tuition} onChange={setTuition} min={0} max={200000} prefix="$" />
+
+                            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
+                                <div style={{ flex: 1 }}>
+                                    <NumberInput label="One-time Expense" value={oneTimeExpense} onChange={setOneTimeExpense} min={0} max={200000} prefix="$" />
+                                </div>
+
+                                <div style={{ width: "140px", display: "flex", flexDirection: "column" }}>
+                                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Year</label>
+                                    <select
+                                        value={oneTimeExpenseYear}
+                                        onChange={(e) => setOneTimeExpenseYear(parseInt(e.target.value || "1", 10))}
+                                        style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid var(--maroon-border)", background: "var(--white)" }}
+                                    >
+                                        {Array.from({ length: years }, (_, i) => (
+                                            <option key={i} value={i + 1}>{`Year ${i + 1}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
+                                <div style={{ flex: 1 }}>
+                                    <NumberInput label="One-time Expense" value={oneTimeExpense2} onChange={setOneTimeExpense2} min={0} max={200000} prefix="$" />
+                                </div>
+
+                                <div style={{ width: "140px", display: "flex", flexDirection: "column" }}>
+                                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Year</label>
+                                    <select
+                                        value={oneTimeExpense2Year}
+                                        onChange={(e) => setOneTimeExpense2Year(parseInt(e.target.value || "1", 10))}
+                                        style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid var(--maroon-border)", background: "var(--white)" }}
+                                    >
+                                        {Array.from({ length: years }, (_, i) => (
+                                            <option key={i} value={i + 1}>{`Year ${i + 1}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
+                                <div style={{ flex: 1 }}>
+                                    <NumberInput label="One-time Expense" value={oneTimeExpense3} onChange={setOneTimeExpense3} min={0} max={200000} prefix="$" />
+                                </div>
+
+                                <div style={{ width: "140px", display: "flex", flexDirection: "column" }}>
+                                    <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 500, color: "var(--text-secondary)", marginBottom: "0.3rem" }}>Year</label>
+                                    <select
+                                        value={oneTimeExpense3Year}
+                                        onChange={(e) => setOneTimeExpense3Year(parseInt(e.target.value || "1", 10))}
+                                        style={{ padding: "6px 8px", borderRadius: "6px", border: "1px solid var(--maroon-border)", background: "var(--white)" }}
+                                    >
+                                        {Array.from({ length: years }, (_, i) => (
+                                            <option key={i} value={i + 1}>{`Year ${i + 1}`}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div style={{ marginTop: "0.6rem" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        // clear one-time expenses
+                                        setOneTimeExpense(0);
+                                        setOneTimeExpenseYear(1);
+                                        setOneTimeExpense2(0);
+                                        setOneTimeExpense2Year(1);
+                                        setOneTimeExpense3(0);
+                                        setOneTimeExpense3Year(1);
+
+                                        // reset loan / tuition fields
+                                        setLoanBalance(0);
+                                        setOsapLoanBalance(0);
+                                        setOsapGrants(0);
+                                        setTuition(0);
+
+                                        // reset monthly expenses and sliders
+                                        setPhone(0);
+                                        setUtilities(0);
+                                        setInternet(0);
+                                        setGroceries(0);
+                                        setRent(0);
+                                        setCar(0);
+                                        setFun(0);
+
+
+
+                                        // residency / interest
+                                        setResidencyPeriod(0);
+                                        setInterestDuringResidency(0);
+
+
+                                        // derived / totals
+                                        setTotalAmount(0);
+                                        setInterestBefore(0);
+
+
+                                    }}
+                                    className="btn-maroon"
+                                >
+                                    Zero all inputs
+                                </button>
+                            </div>
                         </div>
                     </section>
 
