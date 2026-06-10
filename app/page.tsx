@@ -133,7 +133,7 @@ export default function Home() {
         for (let i = 0; i < years; i++) {
             acc *= (1 + (interestRate / 100));
         }
-        if (years == 0) {
+        if (residencyPeriod == 0) {
             setInterestDuringResidency(0);
         } else {
             setInterestDuringResidency(acc - totalAmount);
