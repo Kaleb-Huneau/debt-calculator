@@ -12,20 +12,24 @@ export default function Home() {
     const [interestBefore, setInterestBefore] = useState(0);
     const [totalAmount, setTotalAmount] = useState(0);
     const [loanBalance, setLoanBalance] = useState(0);
-    const [osapLoanBalance, setOsapLoanBalance] = useState(20000);
+    const [osapLoanBalance, setOsapLoanBalance] = useState(15000);
     const [osapGrants, setOsapGrants] = useState(7000);
-    const [interestRate, setInterestRate] = useState(4.5);
+    const [interestRate, setInterestRate] = useState(4.2);
     const [interestDuringResidency, setInterestDuringResidency] = useState(0);
-    const [residencyPeriod, setResidencyPeriod] = useState(0);
+    const [residencyPeriod, setResidencyPeriod] = useState(4);
+    const [interestDuringRepayment, setInterestDuringRepayment] = useState(0);
     // Fixed monthly expenses
     const [phone, setPhone] = useState(60);
     const [utilities, setUtilities] = useState(110);
     const [internet, setInternet] = useState(70);
     const [groceries, setGroceries] = useState(300);
+    const [gym, setGym] = useState(120);
+    const [disabilityBenefit, setDisabilityBenefit] = useState(308);
+    const [income, setIncome] = useState(0);
 
     // Slider expenses
     const [rent, setRent] = useState(2200);
-    const [car, setCar] = useState(600);
+    const [car, setCar] = useState(350);
     const [fun, setFun] = useState(500);
 
     // Projection length in years
@@ -46,13 +50,12 @@ export default function Home() {
     const [oneTimeExpense3, setOneTimeExpense3] = useState(0);
     const [oneTimeExpense3Year, setOneTimeExpense3Year] = useState(1);
 
-    const monthlyExpenses = phone + utilities + internet + groceries + rent + car + fun;
+    const monthlyExpenses = phone + utilities + internet + groceries + rent + car + fun + gym - disabilityBenefit - income;
 
     const handleRepaymentChange = (e: React.ChangeEvent<HTMLSelectElement, HTMLSelectElement>) => {
         const years = parseInt(e.target.value, 10);
         setResidencyPeriod(years);
     };
-
 
     const projectionData = useMemo(() => {
         const months = years * 12;
@@ -62,15 +65,16 @@ export default function Home() {
         let cumulativeInterest = 0;
         let cumulativeExpenses = loanBalance;
 
+
         const data = [];
         let annualTotalDebtStep = 0;
 
-        for (let m = 0; m <= months; m++) {
+        for (let m = 1; m <= months; m++) {
             const year = Math.floor(m / 12);
             const month = m % 12;
 
             // Tuition is paid (borrowed) at the start of each year (including m === 0)
-            if (month === 0 && year < years && tuition > 0) {
+            if (month === 1 && year < years && tuition > 0) {
                 cumulativeExpenses += tuition;
                 cumulativeExpenses -= osapGrants;
                 balance -= osapGrants;
@@ -78,7 +82,11 @@ export default function Home() {
             }
 
             // One-time expenses occur at the start of the selected year (human year 1..N -> code year 0..N-1)
-            if (month === 0) {
+            if (month === 1) {
+                if (year == 0) {
+                    cumulativeExpenses += 24000;
+                    balance += 20000;
+                }
                 if (oneTimeExpense > 0 && year === Math.max(0, oneTimeExpenseYear - 1)) {
                     cumulativeExpenses += oneTimeExpense;
                     balance += oneTimeExpense;
@@ -100,10 +108,10 @@ export default function Home() {
                 balance += monthlyExpenses;
             }
 
-            // Interest accrues on the outstanding balance and is capitalized (compounds)
+            // Interest accrues on the outstanding balance
             const interestThisMonth = (balance - (osapLoanBalance * year)) * monthlyRate;
             cumulativeInterest += interestThisMonth;
-            balance += interestThisMonth;
+
 
             const label =
                 month === 0
@@ -128,18 +136,19 @@ export default function Home() {
                 total: Math.round(balance + cumulativeExpenses),
             });
         }
-        let acc = totalAmount;
 
-        for (let i = 0; i < years; i++) {
-            acc *= (1 + (interestRate / 100));
-        }
+        return data;
+    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants, oneTimeExpense, oneTimeExpenseYear, oneTimeExpense2, oneTimeExpense2Year, oneTimeExpense3, oneTimeExpense3Year, gym, disabilityBenefit]);
+
+
+    useEffect(() => {
+        let acc = finalMonth.expenses * residencyPeriod * (interestRate / 100);
         if (residencyPeriod == 0) {
             setInterestDuringResidency(0);
         } else {
-            setInterestDuringResidency(acc - totalAmount);
+            setInterestDuringResidency(acc);
         }
-        return data;
-    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants, oneTimeExpense, oneTimeExpenseYear, oneTimeExpense2, oneTimeExpense2Year, oneTimeExpense3, oneTimeExpense3Year, interestDuringResidency, residencyPeriod]);
+    })
 
     // Update derived states from the projection data in an effect (avoid setState inside useMemo)
     useEffect(() => {
@@ -173,80 +182,65 @@ export default function Home() {
     }, [salary]);
 
     const repaymentProjectionData = useMemo(() => {
+        // determine repayment horizon (months): ensure we cover projection and an 8-year payback window after start
         const projectionMonths = years * 12;
-        const repaymentWindowMonths = 8 * 12; // 8-year payback window after repayment starts
         const requestedStartMonth = repaymentDelayYears * 12;
-        const startMonth = Math.min(requestedStartMonth, projectionMonths);
-        const months = Math.max(projectionMonths, startMonth + repaymentWindowMonths);
-        const monthlyRate = interestRate / 100 / 12;
+        const cappedStartMonth = Math.min(requestedStartMonth, projectionMonths);
+        const repaymentWindowMonths = 8 * 12; // 8 years
+        const months = Math.max(projectionMonths, cappedStartMonth + repaymentWindowMonths);
 
-        const data: any[] = [];
+        const outstandingInterest = (finalMonth?.cumulativeInterest + interestDuringResidency);
+        let outstandingPrincipal = (finalMonth?.totalDebt) ?? 0;
+        let accruedInterest = 0;
 
-        // copy projection values for months before repayment starts
-        for (let m = 0; m <= Math.min(startMonth - 1, months); m++) {
-            const pd = projectionData[m];
-            data.push({ ...pd, cumulativeRepayments: 0 });
-        }
+        const data: Array<any> = [];
 
-        // initialize from projection at repayment start (or construct initial values if starting immediately)
-        let balance: number;
-        let cumulativeInterest: number;
-        let cumulativeExpenses: number;
-        let cumulativeRepayments = 0;
-        let annualStep = 0;
-
-        if (startMonth === 0) {
-            const lastProjection = projectionData[projectionData.length - 1];
-            balance = lastProjection ? lastProjection.totalDebt : 0;
-            cumulativeInterest = 0;
-            cumulativeExpenses = 0;
-            annualStep = Math.round(balance);
-            if (residencyPeriod !== 0) {
-                balance *= Math.pow((interestRate / 100) + 1, residencyPeriod);
-            }
-        } else {
-            const prev = projectionData[Math.max(0, startMonth - 1)];
-            balance = prev.totalDebt;
-            cumulativeInterest = prev.cumulativeInterest;
-            cumulativeExpenses = prev.expenses;
-            annualStep = prev.totalDebtAnnualStep ?? Math.round(balance);
-        }
-
-        // simulate from startMonth to end
-        for (let m = startMonth; m <= months; m++) {
+        for (let m = 0; m <= months; m++) {
             const year = Math.floor(m / 12);
             const month = m % 12;
 
-            if (month === 0) annualStep = Math.round(balance);
+            const monthlyInterest = outstandingPrincipal * (interestRate / 100) / 12;
+            // accumulate interest
+            let curOutstandingInterest = (data.length === 0 ? outstandingInterest : data[data.length - 1].outstandingInterest ?? outstandingInterest) + monthlyInterest;
+            accruedInterest += monthlyInterest;
 
-            // snapshot at start of period
+            let paymentRemaining = repaymentMonthly;
+
+            // pay interest first
+            const payInterest = Math.min(curOutstandingInterest, paymentRemaining);
+            curOutstandingInterest -= payInterest;
+            paymentRemaining -= payInterest;
+
+            // then pay principal
+            const payPrincipal = Math.min(outstandingPrincipal, paymentRemaining);
+            outstandingPrincipal -= payPrincipal;
+            paymentRemaining -= payPrincipal;
+
+            if (curOutstandingInterest + outstandingPrincipal <= 0) {
+                outstandingPrincipal = 0;
+                curOutstandingInterest = 0;
+            }
+
             data.push({
                 month: m,
                 label: month === 0 ? `Yr ${year}` : month === 6 ? `Yr ${year}.5` : "",
                 showLabel: month === 0 || month === 6,
-                totalDebt: Math.round(balance),
-                totalDebtAnnualStep: annualStep,
-                cumulativeInterest: Math.round(cumulativeInterest),
-                expenses: Math.round(cumulativeExpenses),
-                cumulativeRepayments: Math.round(cumulativeRepayments),
-                total: Math.round(balance + cumulativeExpenses),
+                totalDebt: Math.round(outstandingPrincipal + curOutstandingInterest),
+                totalDebtAnnualStep: 0,
+                cumulativeInterest: Math.round(accruedInterest),
+                expenses: Math.round(finalMonth?.totalDebt ?? 0),
+                total: Math.round((finalMonth?.totalDebt ?? 0) + accruedInterest),
+                outstandingInterest: curOutstandingInterest,
             });
 
-            // subtract payment first (if in repayment period)
-            if (repaymentMonthly > 0) {
-                const paid = Math.min(repaymentMonthly, balance);
-                cumulativeRepayments += paid;
-                balance = Math.max(balance - paid, 0);
+            // stop early if fully paid
+            if (outstandingPrincipal === 0 && curOutstandingInterest === 0) {
+                break;
             }
-
-            // then accrue interest on remaining balance
-            const interestThisMonth = balance * monthlyRate;
-            cumulativeInterest += interestThisMonth;
-            balance += interestThisMonth;
         }
 
         return data;
-    }, [loanBalance, interestRate, monthlyExpenses, years, tuition, osapLoanBalance, osapGrants, oneTimeExpense, oneTimeExpenseYear, oneTimeExpense2, oneTimeExpense2Year, oneTimeExpense3, oneTimeExpense3Year, interestDuringResidency, residencyPeriod, projectionData]);
+    }, [finalMonth, interestRate, repaymentMonthly, years, repaymentDelayYears]);
 
     // Payback period calculation (months from now until totalDebt reaches 0)
     const payoffIndex = repaymentProjectionData.findIndex((d) => d.totalDebt <= 0);
@@ -276,7 +270,7 @@ export default function Home() {
 
     const interestBeforeRepayment = startMonth === 0 ? 0 : Math.round(projectionData[Math.min(startMonth - 1, projectionData.length - 1)]?.cumulativeInterest ?? 0);
     const totalInterest = Math.max(0, Math.round(interestAtEnd));
-    const interestDuringRepayment = Math.max(0, Math.round(totalInterest - interestBeforeRepayment));
+
 
     // Compute years span for the repayment chart so it includes the full 8-year payback window
     const projectionMonths = years * 12;
@@ -285,6 +279,7 @@ export default function Home() {
     const repaymentWindowMonths = 8 * 12; // 8 years
     const repaymentMonthsHorizon = Math.max(projectionMonths, cappedStartMonth + repaymentWindowMonths);
     const repaymentChartYears = Math.ceil(repaymentMonthsHorizon / 12);
+
 
     return (
         <div
@@ -404,19 +399,36 @@ export default function Home() {
                     </section>
 
                     <Divider />
-
                     <section>
-                        <SectionHeader label="Smaller Expenses" />
+                        <SectionHeader label="Income" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                            <SliderInput label="Phone Bill" value={phone} onChange={setPhone} min={0} max={150} step={1} />
-                            <SliderInput label="Utilities" value={utilities} onChange={setUtilities} min={0} max={500} step={1} />
-                            <SliderInput label="Internet" value={internet} onChange={setInternet} min={0} max={300} step={1} />
-                            <SliderInput label="Groceries" value={groceries} onChange={setGroceries} min={0} max={1500} step={10} />
+                            <SliderInput label="Disability Benefit" value={disabilityBenefit} onChange={setDisabilityBenefit} min={0} max={310} step={1} />
+                            <SliderInput label="Other Income" value={income} onChange={setIncome} min={0} max={1000} step={1} />
                         </div>
                     </section>
 
                     <Divider />
 
+                    <section>
+                        <SectionHeader label="Purchases" />
+                        <div style={{ display: "flex", flexDirection: "row", gap: "0.75em", alignItems: "center", height: "2em" }}>
+                            <h5 style={{ fontSize: "medium", padding: "0" }}>Car:</h5>
+                            <h5>$24,000</h5>
+                        </div>
+                    </section>
+                    <Divider />
+
+                    <section>
+                        <SectionHeader label="Monthly Expenses" />
+                        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                            <SliderInput label="Phone" value={phone} onChange={setPhone} min={0} max={100} step={1} />
+                            <SliderInput label="Groceries" value={groceries} onChange={setGroceries} min={0} max={500} step={10} />
+                            <SliderInput label="Utilities" value={utilities} onChange={setUtilities} min={0} max={300} step={10} />
+                            <SliderInput label="Gym" value={gym} onChange={setGym} min={0} max={200} step={10} />
+                            <SliderInput label="Internet" value={internet} onChange={setInternet} min={0} max={300} step={10} />
+                        </div>
+                    </section>
+                    <Divider />
                     <section>
                         <SectionHeader label="Bigger Expenses" />
                         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
@@ -514,6 +526,8 @@ export default function Home() {
                                         setRent(0);
                                         setCar(0);
                                         setFun(0);
+                                        setGym(0);
+                                        setDisabilityBenefit(0);
 
 
 
@@ -553,25 +567,44 @@ export default function Home() {
 
                 <main className="main-panel">
                     <div className="summary-cards-grid">
-                        <SummaryCard label={`Total Spent in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.expenses} color="var(--maroon)" />
+                        <SummaryCard label={`Total Debt Used in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.expenses} color="var(--maroon)" />
                         <SummaryCard label={`Interest Collected in ${years} yr${years > 1 ? "s" : ""}`} value={finalMonth.cumulativeInterest} color="var(--maroon-light)" />
-                        <SummaryCard label="Total Debt After 4 Years" value={finalMonth.totalDebt} color={finalMonth.totalDebt === 0 ? "#2d6a3f" : "var(--maroon-dark)"} note={finalMonth.totalDebt === 0 ? "Paid off! 🎉" : undefined} />
+                        <SummaryCard label="Total Debt + Interest After 4 Years" value={finalMonth.totalDebt + finalMonth.cumulativeInterest} color={finalMonth.totalDebt === 0 ? "#2d6a3f" : "var(--maroon-dark)"} note={finalMonth.totalDebt === 0 ? "Paid off! 🎉" : undefined} />
                     </div>
 
-                    <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1.5rem", flex: 1, minHeight: "280px" }}>
+                    <div style={{ backgroundColor: "var(--white)", border: "1px solid var(--maroon-border)", borderRadius: "8px", padding: "1.5rem", flex: 1, minHeight: "280px", maxHeight: "50vh" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
                             <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.15rem", fontWeight: 600, margin: 0, color: "var(--maroon-dark)" }}>{years}-Year Financial Projection</h2>
                             <div style={{ display: "flex", gap: "1.25rem" }}>
                                 <LegendDot color="#6B0F1A" label="Expenses" />
                                 <LegendDot color="#C5586B" label="Interest Paid" />
-
                             </div>
                         </div>
                         <DebtChart data={projectionData} years={years} />
                     </div>
-
                     <Divider />
-
+                    <section>
+                        <SectionHeader label="Annual Spending" />
+                        <div className="annual-cards">
+                            <div className="annual-card">
+                                <div style={{ marginBottom: "1em", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Spent: {projectionData[11].expenses}</div>
+                                <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Limit: 90000</div>
+                            </div>
+                            <div className="annual-card">
+                                <div style={{ marginBottom: "1em", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Spent: {projectionData[23].expenses - projectionData[11].expenses}</div>
+                                <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Limit: 90000</div>
+                            </div>
+                            <div className="annual-card">
+                                <div style={{ marginBottom: "1em", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Spent: {projectionData[35].expenses - projectionData[23].expenses}</div>
+                                <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Limit: 90000</div>
+                            </div>
+                            <div className="annual-card">
+                                <div style={{ marginBottom: "1em", fontSize: "0.9rem", color: "var(--text-secondary)" }}>Spent: {projectionData[47].expenses - projectionData[35].expenses}</div>
+                                <div style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>Limit: 90000</div>
+                            </div>
+                        </div>
+                    </section>
+                    <Divider />
                     <section>
                         <SectionHeader label="Repayment Plan" />
                         <div className="repayment-flex">
@@ -628,16 +661,17 @@ export default function Home() {
                                         <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${interestBefore.toLocaleString()}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>During repayment</div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${interestDuringRepayment.toLocaleString()}</div>
+                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>During residency</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${Math.round(interestDuringResidency).toLocaleString()}</div>
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>During residency</div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${interestDuringResidency.toLocaleString()}</div>
+                                        <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>During repayment</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${repaymentProjectionData[repaymentProjectionData.length - 1].cumulativeInterest.toLocaleString()}</div>
                                     </div>
+
                                     <div>
                                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total interest</div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--maroon-dark)" }}>${(interestBefore + interestDuringRepayment + interestDuringResidency).toLocaleString()}</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--maroon-dark)" }}>${Math.round(interestBefore + repaymentProjectionData[repaymentProjectionData.length - 1].cumulativeInterest + interestDuringResidency).toLocaleString()}</div>
                                     </div>
                                 </div>
                             </div>
@@ -658,11 +692,11 @@ export default function Home() {
                                     </div>
                                     <div>
                                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total Interest</div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${(interestBefore + interestDuringRepayment + interestDuringResidency).toLocaleString()}</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>${Math.round(interestBefore + repaymentProjectionData[repaymentProjectionData.length - 1].cumulativeInterest + interestDuringResidency).toLocaleString()}</div>
                                     </div>
                                     <div>
                                         <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>Total Paid</div>
-                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--maroon-dark)" }}>${(finalMonth.expenses + interestBefore + interestDuringRepayment + interestDuringResidency).toLocaleString()}</div>
+                                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--maroon-dark)" }}>${Math.round(finalMonth.expenses + (interestBefore + repaymentProjectionData[repaymentProjectionData.length - 1].cumulativeInterest + interestDuringResidency)).toLocaleString()}</div>
                                     </div>
                                 </div>
                             </div>
@@ -673,7 +707,7 @@ export default function Home() {
                 </main>
             </div>
 
-        </div>
+        </div >
     );
 }
 
